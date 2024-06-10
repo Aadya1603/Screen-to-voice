@@ -1,0 +1,7 @@
+requests
+base64
+Pillow
+python-dotenv
+openai
+simpleaudio
+keyboard
