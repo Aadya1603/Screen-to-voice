@@ -1,7 +1,8 @@
 requests
-base64
+pybase64
 Pillow
 python-dotenv
 openai
-simpleaudio
+#simpleaudio
 keyboard
+pygame 
