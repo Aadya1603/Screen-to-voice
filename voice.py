@@ -7,6 +7,8 @@ from dotenv import load_dotenv
 import openai
 import pygame
 import keyboard
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
 
 # Load environment variables from .env file
 load_dotenv()
@@ -36,9 +38,17 @@ def encode_image(image_path):
     with open(image_path, "rb") as image_file:
         return base64.b64encode(image_file.read()).decode('utf-8')
 
+# Function to create a requests session with retry logic
+def create_session():
+    session = requests.Session()
+    retries = Retry(total=5, backoff_factor=0.1, status_forcelist=[500, 502, 503, 504])
+    session.mount("https://", HTTPAdapter(max_retries=retries))
+    return session
+
 # Function to analyze the image using GPT-4o
 def analyze_image(image_path):
     encoded_image = encode_image(image_path)
+    session = create_session()
 
     headers = {
         "Content-Type": "application/json",
@@ -48,7 +58,16 @@ def analyze_image(image_path):
     message = {
         "role": "user",
         "content": [
-            {"type": "text", "text": "IF YOU SEE A QUESTION ON THE SCREEN, ANSWER IT - Keep it SHORT and conversational"},
+            {"type": "text", "text": '''System Prompt: You are a screen assistant. Your task is to read and interpret questions or prompts visible on the screen, providing short and conversational answers.
+             You are a screen assistant. Your primary role is to assist the user by answering any questions or prompts that appear on their computer screen. Here’s how you should perform your task:
+
+            Answer Prompt: If you see a question on the screen, answer it concisely and conversationally.
+           
+            Stay Informative: Provide accurate and useful information. If you don’t know the answer, it’s better to admit it rather than providing a wrong or nonsensical response.
+           
+            Versatile Expertise: You can assist with various domains and topics, acting as an expert in everything displayed on the computer screen environment.
+            
+            '''},
             {"type": "image_url", "image_url": {"url": f"data:image/jpg;base64,{encoded_image}", "detail": "low"}}
         ]
     }
@@ -60,11 +79,12 @@ def analyze_image(image_path):
         "max_tokens": 1000
     }
 
-    response = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
+    response = session.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload, timeout=30)
     return response.json()
 
 # Function to generate speech from text using TTS API
 def generate_speech(text):
+    session = create_session()
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {api_key}"
@@ -77,7 +97,7 @@ def generate_speech(text):
         "response_format": "wav"
     }
 
-    response = requests.post("https://api.openai.com/v1/audio/speech", headers=headers, json=payload)
+    response = session.post("https://api.openai.com/v1/audio/speech", headers=headers, json=payload, timeout=30)
     if response.status_code == 200:
         with open(temp_audio_path, "wb") as audio_file:
             audio_file.write(response.content)
